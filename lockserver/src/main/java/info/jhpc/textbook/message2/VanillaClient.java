@@ -38,9 +38,10 @@
 
 package info.jhpc.textbook.message2;
 
-import java.io.IOException;
 import info.jhpc.message2.Message;
 import info.jhpc.message2.MessageClient;
+
+import java.io.IOException;
 
 public class VanillaClient {
 
