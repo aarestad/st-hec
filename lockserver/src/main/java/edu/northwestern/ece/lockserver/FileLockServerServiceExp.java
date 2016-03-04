@@ -27,7 +27,7 @@ public final class FileLockServerServiceExp implements MessageListener {
 	/**
 	 * Lock information: key=filename, val=List of locks on the file
 	 */
-	static Map fileLockDict;
+	static Map<String, List<FileLock>> fileLockDict;
 
 	/**
 	 * Next lock ID to be issued
@@ -222,7 +222,7 @@ public final class FileLockServerServiceExp implements MessageListener {
 					// get copy of currentFileLocks
 					List copy;
 					synchronized (currentFileLocks) {
-						copy = new ArrayList(currentFileLocks);
+						copy = new ArrayList<>(currentFileLocks);
 					}
 
                     for (Object aCopy : copy) {

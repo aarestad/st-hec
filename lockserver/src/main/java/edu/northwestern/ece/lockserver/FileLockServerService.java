@@ -1,43 +1,23 @@
-/*
- * Created on Mar 7, 2005
- *
- * TODO To change the template for this generated file go to
- * Window - Preferences - Java - Code Generation - Code and Comments
- */
 package edu.northwestern.ece.lockserver;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Comparator;
 
 import info.jhpc.message2.Message;
 import info.jhpc.message2.MessageListener;
 import info.jhpc.message2.MessageServer;
 
-/**
- * @author aarestad
- * 
- * TODO To change the template for this generated type comment go to Window -
- * Preferences - Java - Code Generation - Code and Comments
- */
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
 public final class FileLockServerService implements MessageListener {
 	public static final int FILE_LOCK_SERVER_SERVICE_MESSAGE = 100;
 
 	public static final int FILE_LOCK_SERVER_SERVICE_PORT = 35711;
 
-	/**
-	 * Lock information: key=filename, val=List of locks on the file
-	 */
-	private static Map fileLockDict;
+	private static final Map<String, List<FileLock>> fileLockDict = Collections.synchronizedMap(new HashMap<>());
 
 	/**
 	 * Next lock ID to be issued
 	 */
-	private static Integer lockID;
+	private static final AtomicInteger lockID = new AtomicInteger(0);
 
 	/**
 	 * @see info.jhpc.message2.MessageListener#accept(info.jhpc.message2.Message)
@@ -48,8 +28,7 @@ public final class FileLockServerService implements MessageListener {
 		if (myLockID == -1) {
 			synchronized (lockID) {
 				//System.err.println("Assign lock ID " + lockID);
-				myLockID = lockID.intValue();
-				lockID = new Integer(myLockID + 1);
+				myLockID = lockID.getAndIncrement();
 			}
 		}
 
@@ -70,7 +49,7 @@ public final class FileLockServerService implements MessageListener {
 
 	private Message acquire(Message m, int myLockID, String fileName) {
 		long timeBegin = System.currentTimeMillis();
-		List newLockList = Collections.synchronizedList(new ArrayList());
+		List<FileLock> newLockList = Collections.synchronizedList(new ArrayList<>());
 		int fileLocksGranted = 0;
 
 		int numLocks = m.getIntegerParam("numLocks");
@@ -97,9 +76,8 @@ public final class FileLockServerService implements MessageListener {
 			fileLocksGranted = newLockList.size();
 		} else {
 			List currentFileLocks = (List) fileLockDict.get(fileName);
-			FileLock firstNewLock = (FileLock) newLockList.get(0);
-			FileLock lastNewLock = (FileLock) newLockList.get(newLockList
-					.size() - 1);
+			FileLock firstNewLock = newLockList.get(0);
+			FileLock lastNewLock = newLockList.get(newLockList.size() - 1);
 			long newLockLB = firstNewLock.getOffset();
 			long newLockUB = lastNewLock.getOffset()
 					+ lastNewLock.getLength() - 1;
@@ -153,6 +131,7 @@ public final class FileLockServerService implements MessageListener {
 		Message reply = new Message();
 		if (fileLockDict.containsKey(fileName)) {
 			List currentFileLocks = (List) fileLockDict.get(fileName);
+
 			synchronized (currentFileLocks) {
 				Iterator lockIter = currentFileLocks.iterator();
 				while (lockIter.hasNext()) {
@@ -162,6 +141,7 @@ public final class FileLockServerService implements MessageListener {
 					}
 				}
 			}
+
 			// Remove the hash entry if there are no more locks
 			if (currentFileLocks.size() == 0) {
 				//System.err.println("Removing lock table entry for file " +
@@ -185,9 +165,6 @@ public final class FileLockServerService implements MessageListener {
 	}
 
 	public static void main(String[] args) {
-		fileLockDict = Collections.synchronizedMap(new HashMap());
-		lockID = new Integer(0);
-
 		FileLockServerService flss = new FileLockServerService();
 		MessageServer ms;
 		try {
