@@ -6,19 +6,12 @@
  */
 package edu.northwestern.ece.lockserver;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Comparator;
-
 import info.jhpc.message2.Message;
 import info.jhpc.message2.MessageListener;
 import info.jhpc.message2.MessageServer;
+import org.apache.commons.collections4.list.TreeList;
 
-import org.apache.commons.collections.list.TreeList;
+import java.util.*;
 
 /**
  * @author aarestad
@@ -181,7 +174,7 @@ public final class FileLockServerServiceExp implements MessageListener {
 
 	public static void main(String[] args) {
 		fileLockDict = Collections.synchronizedMap(new HashMap());
-		lockID = new Integer(0);
+		lockID = 0;
 
 		FileLockServerServiceExp flss = new FileLockServerServiceExp();
 		MessageServer ms;
@@ -200,11 +193,7 @@ public final class FileLockServerServiceExp implements MessageListener {
 	}
 
 	private static class FileLockRemovalThread extends Thread {
-		public static List requestQueue;
-
-		public FileLockRemovalThread() {
-			requestQueue = Collections.synchronizedList(new ArrayList());
-		}
+		public static final List<RemoveRequest> requestQueue = Collections.synchronizedList(new ArrayList<>());
 
 		public void run() {
 			while (true) {
@@ -214,7 +203,7 @@ public final class FileLockServerServiceExp implements MessageListener {
 					isEmpty = requestQueue.isEmpty();
 					if (!isEmpty) {
 						System.out.println(requestQueue.size() + " requests outstanding");
-						req = (RemoveRequest) requestQueue.remove(0);
+						req = requestQueue.remove(0);
 					}
 				}
 				if (isEmpty) {
@@ -226,23 +215,24 @@ public final class FileLockServerServiceExp implements MessageListener {
 				// else...
 				String fileName = req.getFileName();
 				int myLockID = req.getLockID();
+
 				if (fileLockDict.containsKey(fileName)) {
-					List currentFileLocks = (List) fileLockDict
-							.get(fileName);
+					List currentFileLocks = (List) fileLockDict.get(fileName);
+
 					// get copy of currentFileLocks
 					List copy;
 					synchronized (currentFileLocks) {
 						copy = new ArrayList(currentFileLocks);
 					}
-					Iterator copyIter = copy.iterator();
-					while (copyIter.hasNext()) {
-						synchronized (currentFileLocks) {
-							FileLock currLock = (FileLock) copyIter.next();
-							if (myLockID == currLock.getLockID()) {
-								currentFileLocks.remove(currLock);
-							}
-						}
-					}
+
+                    for (Object aCopy : copy) {
+                        synchronized (currentFileLocks) {
+                            FileLock currLock = (FileLock) aCopy;
+                            if (myLockID == currLock.getLockID()) {
+                                currentFileLocks.remove(currLock);
+                            }
+                        }
+                    }
 					// Remove the hash entry if there are no more locks
 					if (currentFileLocks.size() == 0) {
 						//System.err.println("Removing lock table entry for
